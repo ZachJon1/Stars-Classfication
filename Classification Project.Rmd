@@ -33,6 +33,10 @@ glimpse(df)
 
 
 ```{r}
+# check for missing data
 
+sum(is.na.data.frame(df))
+
+# 
 
 ```
