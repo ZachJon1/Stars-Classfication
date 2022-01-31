@@ -1,0 +1,38 @@
+---
+title: "Classification Project"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+#Load libraries
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(moments)
+library(e1071)
+library(caret)
+library(kableExtra)
+library(corrplot)
+library(knitr)
+library(lattice)
+```
+
+```{r}
+#Load the data
+
+df <- read.csv("star_classification.csv")
+
+# View dataframe
+glimpse(df)
+```
+
+
+```{r}
+
+
+```
