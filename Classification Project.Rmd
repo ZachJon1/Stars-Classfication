@@ -8,8 +8,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 
-```{r}
-#Load libraries
+#Loading libraries
 library(tidyverse)
 library(ggplot2)
 library(dplyr)
@@ -20,23 +19,87 @@ library(kableExtra)
 library(corrplot)
 library(knitr)
 library(lattice)
-```
+library(psych)
 
-```{r}
-#Load the data
-
+#Loading dataset
 df <- read.csv("star_classification.csv")
+df
 
-# View dataframe
-glimpse(df)
-```
-
-
-```{r}
-# check for missing data
-
+#check for missing data
 sum(is.na.data.frame(df))
 
-# 
+#creating predictor df and response df
+predictors<-df%>%select(c(-obj_ID, -class, -rerun_ID))
+response<-df$class
 
-```
+predictors
+response
+
+#checking correlation
+correlations = cor(predictors)
+corrplot(correlations, order = "hclust")
+
+highCorr <- findCorrelation(correlations, cutoff = .95)
+length(highCorr)
+
+filteredPredictors <- predictors[, -highCorr]
+
+dim(predictors)
+dim(filteredPredictors)
+
+filteredCorrelations = cor(filteredPredictors)
+corrplot(filteredCorrelations, order = "hclust")
+
+#checking skewness
+skewValues <- apply(filteredPredictors, 2, skewness)
+skewValues
+
+#pre-processing transformations
+trans <- preProcess(filteredPredictors, method = c("BoxCox", "center", "scale"))
+trans
+
+# Apply the transformation:
+transformedPred<- predict(trans, filteredPredictors)
+transformedPred
+
+#checking skew ness after transformation
+skewValues <- apply(transformedPred, 2, skewness)
+skewValues
+
+transformedPred$u <- exp(transformedPred$u)
+##transformedPred$redshift <- log(transformedPred$redshift)
+
+skewValues <- apply(transformedPred, 2, skewness)
+skewValues
+
+#checking for outliers via box plots
+
+transformedPred %>%
+  gather() %>% 
+  ggplot(aes(x ="", y = value))+
+  geom_boxplot(outlier.colour = "lightblue", fill="green") +
+  facet_wrap(~ key, scales = "free") +
+  labs(x = NULL, y = NULL) +
+  theme_bw() +
+  theme(axis.ticks.y=element_blank())
+
+#removing outliers by SpatialSign
+#pre-processing transformations
+trans <- preProcess(transformedPred, method = c("spatialSign"))
+trans
+
+# Apply the transformation:
+transformedPred<- predict(trans, transformedPred)
+transformedPred
+
+#checking for outliers after transformation
+
+transformedPred %>%
+  gather() %>% 
+  ggplot(aes(x ="", y = value))+
+  geom_boxplot(outlier.colour = "lightblue", fill="green") +
+  facet_wrap(~ key, scales = "free") +
+  labs(x = NULL, y = NULL) +
+  theme_bw() +
+  theme(axis.ticks.y=element_blank())
+
