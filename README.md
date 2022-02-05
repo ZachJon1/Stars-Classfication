@@ -1,1 +1,1 @@
-# Stars-Classfication
+# Stars-Classification
