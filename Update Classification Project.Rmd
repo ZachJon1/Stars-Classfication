@@ -1,0 +1,224 @@
+---
+title: "Classification Project"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#Loading libraries
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(moments)
+library(e1071)
+library(caret)
+library(kableExtra)
+library(corrplot)
+library(knitr)
+library(lattice)
+library(psych)
+library(car)
+```
+
+
+```{r}
+
+#Loading dataset
+df <- read.csv("star_classification.csv")
+df
+nrow(df)
+```
+
+
+```{r}
+
+#check for missing data
+sum(is.na.data.frame(df))
+```
+
+```{r}
+#creating predictor df and response df and dropping unwanted predictors
+predictors<-df%>%select(c(-obj_ID, -class, -rerun_ID,-run_ID, -cam_col,-field_ID, -spec_obj_ID, -fiber_ID, -MJD, -plate))
+response<-df%>%select(c(class))
+
+predictors
+response
+```
+
+```{r}
+filteredPredictors<-df%>%select(c(-obj_ID, -class, -rerun_ID,-run_ID, -cam_col,-field_ID, -spec_obj_ID, -fiber_ID, -MJD, -plate))
+
+#checking correlation
+correlations = cor(predictors)
+corrplot(correlations, order = "hclust")
+
+```
+
+```{r}
+highCorr <- findCorrelation(correlations, cutoff = .95)
+length(highCorr)
+
+##filteredPredictors <- predictors[, -highCorr]
+
+#dim(predictors)
+#dim(filteredPredictors)
+
+##filteredCorrelations = cor(filteredPredictors)
+##corrplot(filteredCorrelations, order = "hclust")
+
+#plotting histograms to see distribution
+filteredPredictors %>%
+  gather() %>% 
+  ggplot(aes(x = value))+
+  geom_histogram() +
+  facet_wrap(~ key, scales = "free") +
+  labs(x = NULL, y = NULL) +
+  theme_bw() +
+  theme(axis.ticks.y=element_blank())
+```
+
+```{r}
+#checking skewness values
+skewValues <- apply(filteredPredictors, 2, skewness)
+skewValues
+```
+
+
+```{r}
+#determining bad data
+describe(filteredPredictors)
+
+filteredPredictors[which(filteredPredictors$u <0), ]
+filteredPredictors[which(filteredPredictors$g <0), ]
+filteredPredictors[which(filteredPredictors$z <0), ]
+```
+
+```{r}
+#dropping bad observation
+filteredPredictors<-filteredPredictors%>%slice((-79544))
+response<-response%>%slice((-79544))
+
+```
+
+```{r}
+#checking skewness values
+skewValues <- apply(filteredPredictors, 2, skewness)
+skewValues
+
+#pre-processing transformations
+trans <- preProcess(filteredPredictors, method = c("BoxCox", "center", "scale"))
+trans
+```
+
+```{r}
+# Apply the transformation:
+transformedPred<- predict(trans, filteredPredictors)
+transformedPred
+
+#checking skewness after transformation
+skewValues <- apply(transformedPred, 2, skewness)
+skewValues
+```
+
+```{r}
+#plotting histograms to see distribution
+transformedPred %>%
+  gather() %>% 
+  ggplot(aes(x = value))+
+  geom_histogram() +
+  facet_wrap(~ key, scales = "free") +
+  labs(x = NULL, y = NULL) +
+  theme_bw() +
+  theme(axis.ticks.y=element_blank())
+```
+
+
+```{r}
+#checking for outliers via box plots
+
+transformedPred %>%
+  gather() %>% 
+  ggplot(aes(x ="", y = value))+
+  geom_boxplot(outlier.colour = "lightblue", fill="green") +
+  facet_wrap(~ key, scales = "free") +
+  labs(x = NULL, y = NULL) +
+  theme_bw() +
+  theme(axis.ticks.y=element_blank())
+```
+
+```{r}
+#removing outliers by SpatialSign
+#pre-processing transformations
+trans <- preProcess(transformedPred, method = c("spatialSign"))
+trans
+
+# Apply the transformation:
+transformedPred<- predict(trans, transformedPred)
+transformedPred
+```
+
+
+```{r}
+#checking for outliers after transformation
+transformedPred %>%
+  gather() %>% 
+  ggplot(aes(x ="", y = value))+
+  geom_boxplot(outlier.colour = "lightblue", fill="green") +
+  facet_wrap(~ key, scales = "free") +
+  labs(x = NULL, y = NULL) +
+  theme_bw() +
+  theme(axis.ticks.y=element_blank())
+```
+
+
+```{r}
+###############################################
+#checking distribution of classes to decide on splitting method
+barplot(table(response$class))
+
+set.seed(25)
+
+#stratified random sampling
+trainingRows <- createDataPartition(response$class, p = .70, list= FALSE)
+nrow(trainingRows)
+```
+
+```{r}
+#creating training and testing data
+
+trainPredictors <- transformedPred [trainingRows, ]
+trainClasses <- response[trainingRows]
+
+nrow(trainClasses)
+
+# Do the same for the test set using negative integers.
+testPredictors <- transformedPred[-trainingRows, ]
+testClasses <- response[-trainingRows]
+str(trainPredictors)
+str(testPredictors)
+nrow(transformedPred)
+nrow(response)
+nrow(trainPredictors)
+nrow(testPredictors)
+str(trainClasses)
+str(testClasses)
+```
+
+
+```{r}
+#checking frequency distribution of training and test classes
+barplot(table(response$class))
+barplot(table(trainClasses))
+barplot(table(testClasses))
+
+```
+
+
+```{r}
+#resampling
+
+```
+
