@@ -20,20 +20,24 @@ library(corrplot)
 library(knitr)
 library(lattice)
 library(psych)
+library(car)
 
 #Loading dataset
 df <- read.csv("star_classification.csv")
 df
+nrow(df)
 
 #check for missing data
 sum(is.na.data.frame(df))
 
-#creating predictor df and response df
-predictors<-df%>%select(c(-obj_ID, -class, -rerun_ID))
-response<-df$class
+#creating predictor df and response df and dropping unwanted predictors
+predictors<-df%>%select(c(-obj_ID, -class, -rerun_ID,-run_ID, -cam_col,-field_ID, -spec_obj_ID, -fiber_ID, -MJD, -plate))
+response<-df%>%select(c(class))
 
 predictors
 response
+
+filteredPredictors<-df%>%select(c(-obj_ID, -class, -rerun_ID,-run_ID, -cam_col,-field_ID, -spec_obj_ID, -fiber_ID, -MJD, -plate))
 
 #checking correlation
 correlations = cor(predictors)
@@ -42,15 +46,40 @@ corrplot(correlations, order = "hclust")
 highCorr <- findCorrelation(correlations, cutoff = .95)
 length(highCorr)
 
-filteredPredictors <- predictors[, -highCorr]
+##filteredPredictors <- predictors[, -highCorr]
 
-dim(predictors)
-dim(filteredPredictors)
+#dim(predictors)
+#dim(filteredPredictors)
 
-filteredCorrelations = cor(filteredPredictors)
-corrplot(filteredCorrelations, order = "hclust")
+##filteredCorrelations = cor(filteredPredictors)
+##corrplot(filteredCorrelations, order = "hclust")
 
-#checking skewness
+#plotting histograms to see distribution
+filteredPredictors %>%
+  gather() %>% 
+  ggplot(aes(x = value))+
+  geom_histogram() +
+  facet_wrap(~ key, scales = "free") +
+  labs(x = NULL, y = NULL) +
+  theme_bw() +
+  theme(axis.ticks.y=element_blank())
+
+#checking skewness values
+skewValues <- apply(filteredPredictors, 2, skewness)
+skewValues
+
+#determining bad data
+describe(filteredPredictors)
+
+filteredPredictors[which(filteredPredictors$u <0), ]
+filteredPredictors[which(filteredPredictors$g <0), ]
+filteredPredictors[which(filteredPredictors$z <0), ]
+
+#dropping bad observation
+filteredPredictors<-filteredPredictors%>%slice(-c(79544))
+response<-response%>%slice(-c(79544))
+
+#checking skewness values
 skewValues <- apply(filteredPredictors, 2, skewness)
 skewValues
 
@@ -62,15 +91,19 @@ trans
 transformedPred<- predict(trans, filteredPredictors)
 transformedPred
 
-#checking skew ness after transformation
+#checking skewness after transformation
 skewValues <- apply(transformedPred, 2, skewness)
 skewValues
 
-transformedPred$u <- exp(transformedPred$u)
-##transformedPred$redshift <- log(transformedPred$redshift)
-
-skewValues <- apply(transformedPred, 2, skewness)
-skewValues
+#plotting histograms to see distribution
+transformedPred %>%
+  gather() %>% 
+  ggplot(aes(x = value))+
+  geom_histogram() +
+  facet_wrap(~ key, scales = "free") +
+  labs(x = NULL, y = NULL) +
+  theme_bw() +
+  theme(axis.ticks.y=element_blank())
 
 #checking for outliers via box plots
 
@@ -93,7 +126,6 @@ transformedPred<- predict(trans, transformedPred)
 transformedPred
 
 #checking for outliers after transformation
-
 transformedPred %>%
   gather() %>% 
   ggplot(aes(x ="", y = value))+
@@ -103,3 +135,39 @@ transformedPred %>%
   theme_bw() +
   theme(axis.ticks.y=element_blank())
 
+###############################################
+#checking distribution of classes to decide on splitting method
+barplot(table(response$class))
+
+set.seed(1)
+
+#stratifed random sampling
+trainingRows <- createDataPartition(response$class, p = .70, list= FALSE)
+nrow(trainingRows)
+
+#creating training and testing data
+
+trainPredictors <- transformedPred [trainingRows, ]
+trainClasses <- response[trainingRows]
+
+nrow(trainClasses)
+
+# Do the same for the test set using negative integers.
+testPredictors <- transformedPred[-trainingRows, ]
+testClasses <- response[-trainingRows]
+str(trainPredictors)
+str(testPredictors)
+
+nrow(transformedPred)
+nrow(response)
+nrow(trainPredictors)
+nrow(testPredictors)
+str(trainClasses)
+str(testClasses)
+
+#checking frequency distribution of training and test classes
+barplot(table(response$class))
+barplot(table(trainClasses))
+barplot(table(testClasses))
+
+#resamplig
